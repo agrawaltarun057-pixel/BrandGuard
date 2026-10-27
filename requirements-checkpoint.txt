@@ -1,0 +1,10 @@
+from pathlib import Path
+
+requirements = """fastapi
+uvicorn
+pydantic
+"""
+
+Path("requirements.txt").write_text(requirements, encoding="utf-8")
+
+print("requirements.txt created successfully!")
