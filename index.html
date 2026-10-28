@@ -69,7 +69,7 @@ if(o.img&&!(o.alt||'').trim())add('Accessibility','Image has no alt text','Scree
 if(o.fg&&o.bg){const c=cr(o.fg,o.bg);if(c<4.5)add('Accessibility','Low colour contrast ('+c.toFixed(1)+':1)','Text needs at least 4.5:1 contrast against its background.','WCAG 1.4.3',c<3?'high':'medium',.99,'Use a darker text colour or a lighter background.',null)}
 return F.sort((a,b)=>({high:0,medium:1,low:2}[a.sv]-{high:0,medium:1,low:2}[b.sv]))}
 function hl(t,F){const R=F.filter(f=>f.r).map(f=>({a:f.r[0],b:f.r[1],sv:f.sv,i:f.i})).sort((x,y)=>x.a-y.a);let o='',p=0;R.forEach(r=>{if(r.a<p)return;o+=esc(t.slice(p,r.a))+`<mark class="${r.sv}" title="${esc(r.i)}">${esc(t.slice(r.a,r.b))}</mark>`;p=r.b});return o+esc(t.slice(p))}
-const api=async(p,m='GET',b)=>{const r=await fetch('http://127.0.0.1:8000'+p,{method:m,headers:{'Content-Type':'application/json','X-Role':S.role,'X-User':U[S.role]},body:b?JSON.stringify(b):undefined});if(!r.ok){let e='Request failed';try{e=(await r.json()).detail||e}catch(_){}throw new Error(e)}return r.json()};
+const api=async(p,m='GET',b)=>{const r=await fetch('https://brandguard-xcmp.onrender.com'+p,{method:m,headers:{'Content-Type':'application/json','X-Role':S.role,'X-User':U[S.role]},body:b?JSON.stringify(b):undefined});if(!r.ok){let e='Request failed';try{e=(await r.json()).detail||e}catch(_){}throw new Error(e)}return r.json()};
 const load=async()=>{Object.assign(S,await api('/api/state'))};
 const boot=async()=>{try{await load()}catch(e){toast('Backend not reachable: start the server first')}render()};
 const stc=s=>({Pending:'Pending approval',Changes:'Changes requested'}[s]||s);
