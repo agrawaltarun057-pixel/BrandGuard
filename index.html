@@ -68,8 +68,8 @@ const hl=/disease|cancer|illness/i.exec(t);if(hl)add('Claim','Possible health cl
 if(o.img&&!(o.alt||'').trim())add('Accessibility','Image has no alt text','Screen-reader users cannot understand the image.','WCAG 1.1.1','medium',.99,'Add a short description of what the image shows.',null);
 if(o.fg&&o.bg){const c=cr(o.fg,o.bg);if(c<4.5)add('Accessibility','Low colour contrast ('+c.toFixed(1)+':1)','Text needs at least 4.5:1 contrast against its background.','WCAG 1.4.3',c<3?'high':'medium',.99,'Use a darker text colour or a lighter background.',null)}
 return F.sort((a,b)=>({high:0,medium:1,low:2}[a.sv]-{high:0,medium:1,low:2}[b.sv]))}
-function hl(t,F){const R=F.filter(f=>f.r).map(f=>({a:f.r[0],b:f.r[1],sv:f.sv,i:f.i})).sort((x,y)=>x.a-y.a);let o='',p=0;R.forEach(r=>{if(r.a<p)return;o+=esc(t.slice(p,r.a))+`<mark class="${r.sv}" title="${esc(r.i)}">${esc(t.slice(r.a,r.b))}</mark>`;p=r.b});return o+esc(t.slice(p))}
-const api=async(p,m='GET',b)=>{const r=await fetch('https://brandguard-xcmp.onrender.com'+p,{method:m,headers:{'Content-Type':'application/json','X-Role':S.role,'X-User':U[S.role]},body:b?JSON.stringify(b):undefined});if(!r.ok){let e='Request failed';try{e=(await r.json()).detail||e}catch(_){}throw new Error(e)}return r.json()};
+function hl(t,F){F=Array.isArray(F)?F:[];const R=F.filter(f=>f.r).map(f=>({a:f.r[0],b:f.r[1],sv:f.sv,i:f.i})).sort((x,y)=>x.a-y.a);let o='',p=0;R.forEach(r=>{if(r.a<p)return;o+=esc(t.slice(p,r.a))+`<mark class="${r.sv}" title="${esc(r.i)}">${esc(t.slice(r.a,r.b))}</mark>`;p=r.b});return o+esc(t.slice(p))}
+const api=async(p,m='GET',b)=>{const r=await fetch('http://127.0.0.1:8000'+p,{method:m,headers:{'Content-Type':'application/json','X-Role':S.role,'X-User':U[S.role]},body:b?JSON.stringify(b):undefined});if(!r.ok){let e='Request failed';try{e=(await r.json()).detail||e}catch(_){}throw new Error(e)}return r.json()};
 const load=async()=>{Object.assign(S,await api('/api/state'))};
 const boot=async()=>{try{await load()}catch(e){toast('Backend not reachable: start the server first')}render()};
 const stc=s=>({Pending:'Pending approval',Changes:'Changes requested'}[s]||s);
@@ -78,7 +78,7 @@ function fc(f,i,m,dec){return `<div class="f ${f.sv}"><div class="row"><h3>${esc
 <p><b>Why flagged:</b> ${esc(f.w)}</p><p><b>Source:</b> ${esc(f.s)}</p><p class="sg">💡 <b>Suggested fix:</b> ${esc(f.sg)}</p>
 <div class="row mt note">Confidence <span class="bar"><i style="width:${f.cf*100}%"></i></span> ${Math.round(f.cf*100)}% ${f.cf<.6?'<span class="chip Changes">⚠️ Needs human review</span>':''}<span class="sp"></span>
 ${m=='d'?`<button class="btn s ${dec=='fix'?'g':''}" onclick="dec(${i},'fix')">✔ I will fix it</button><button class="btn s ${dec=='dis'?'w':''}" onclick="dec(${i},'dis')">✋ I disagree</button><button class="btn s" onclick="navigator.clipboard&&navigator.clipboard.writeText(S.draft.F[${i}].sg);toast('Suggestion copied')">Copy</button>`:(dec?`<span class="chip">Creator: ${dec=='fix'?'will fix':'disagrees'}</span>`:'')}</div></div>`}
-const sum=F=>['high','medium','low'].map(s=>`<span class="chip ${s}" style="color:var(--c)">${F.filter(f=>f.sv==s).length} ${s}</span>`).join(' ');
+const sum=F=>(F=Array.isArray(F)?F:[],['high','medium','low']).map(s=>`<span class="chip ${s}" style="color:var(--c)">${F.filter(f=>f.sv==s).length} ${s}</span>`).join(' ');
 function toast(m){const t=$('#toast');t.textContent=m;t.className='on';clearTimeout(toast.h);toast.h=setTimeout(()=>t.className='',2200)}
 function side(){const pend=S.subs.filter(s=>s.status=='Pending').length;$('#side').innerHTML=`<div class="logo"><i>🛡️</i>BrandGuard</div><div class="lbl">Signed in as</div>
 <select onchange="S.role=this.value;S.page='dash';render()">${Object.keys(U).map(r=>`<option ${r==S.role?'selected':''} value="${r}">${U[r]} · ${r}</option>`).join('')}</select><div class="lbl">Workspace</div>
@@ -104,15 +104,30 @@ return `<h1>Submit &amp; review</h1><p class="sub">${d.rev?'Revising “'+esc(d.
 <label class="note">Content (ad, notice or template)</label><textarea oninput="S.draft.text=this.value" placeholder="Paste your copy here…">${esc(d.text)}</textarea>
 <div class="row mt"><span class="note">Text colour</span><input type="color" value="${d.fg}" oninput="S.draft.fg=this.value"><span class="note">Background</span><input type="color" value="${d.bg}" oninput="S.draft.bg=this.value"><label class="row"><input type="checkbox" ${d.img?'checked':''} onchange="S.draft.img=this.checked;$('#alt').style.display=this.checked?'block':'none'"> Contains image</label><input id="alt" style="display:${d.img?'block':'none'};max-width:240px" placeholder="Image alt text" value="${esc(d.alt)}" oninput="S.draft.alt=this.value"></div>
 <div class="row mt"><button class="btn p" onclick="run()">🔍 Run AI review</button><button class="btn" onclick="S.draft.text=T0;S.draft.title=S.draft.title||'Diwali offer post';render()">Load sample ad with errors</button></div></div><div id="res" class="mt"></div>`},
-mine(){const L=S.subs.filter(s=>s.author=='Asha');return `<h1>My submissions</h1><p class="sub">Track status, comments and versions.</p>${L.map(s=>{const l=s.v[s.v.length-1],k={Pending:1,Changes:2,Approved:2,Rejected:2}[s.status];return `<div class="card mt"><div class="row"><h2 style="margin:0">${esc(s.title)}</h2>${chip(s.status)}<span class="sp"></span><span class="note">${s.v.length} version(s)</span>${s.status=='Changes'?`<button class="btn w" onclick="revise(${s.id})">✏️ Revise</button>`:''}</div>
-<div class="steps"><span class="d">Submitted</span><span class="${k>=1?'d':''}">Under review</span><span class="${k>=2?'d':''}">Decision</span></div><div class="doc">${hl(l.text,l.F)}</div>${s.comments.map(c=>`<p>💬 <b>${c.u}:</b> ${esc(c.t)}</p>`).join('')}</div>`}).join('')}`},
-queue(){const s=S.subs.find(x=>x.id==S.sel)||S.subs[0],l=s.v[s.v.length-1];
-return `<h1>Approval queue</h1><p class="sub">Review findings, discuss and decide. Nothing is published without a human decision.</p><div class="cols"><div>${S.subs.map(x=>`<div class="li ${x.id==s.id?'on':''}" onclick="S.sel=${x.id};render()"><b>${esc(x.title)}</b><div class="row note">${x.author} · v${x.v.length} ${chip(x.status)}</div></div>`).join('')}</div>
+mine(){const L=S.subs.filter(s=>(s.creator||s.author||'Asha')=='Asha');return `<h1>My submissions</h1><p class="sub">Track status, comments and versions.</p>${L.map(s=>{const l=s.v[s.v.length-1],k={Pending:1,Changes:2,Approved:2,Rejected:2}[s.status];return `<div class="card mt"><div class="row"><h2 style="margin:0">${esc(s.title)}</h2>${chip(s.status)}<span class="sp"></span><span class="note">${s.v.length} version(s)</span>${s.status=='Changes'?`<button class="btn w" onclick="revise(${s.id})">✏️ Revise</button>`:''}</div>
+<div class="steps"><span class="d">Submitted</span><span class="${k>=1?'d':''}">Under review</span><span class="${k>=2?'d':''}">Decision</span></div><div class="doc">${hl(l.text,l.F)}</div>${(s.comments||[]).map(c=>`<p>💬 <b>${c.u}:</b> ${esc(c.t)}</p>`).join('')}</div>`}).join('')}`},
+queue(){
+const s=S.subs.find(x=>x.id==S.sel)||S.subs[0];
+
+if(!s){
+return `<h1>Approval Queue</h1>
+<p class="sub">Review submissions, findings and approval decisions.</p>
+<div class="card mt">
+<h2>📭 No submissions yet</h2>
+<p>There are currently no submissions waiting for review.</p>
+<p class="note">Submit content first, then return here to review it.</p>
+<button class="btn mt" onclick="S.page='submit';render()">✍️ Go to Submit & Review</button>
+</div>`;
+}
+
+const l=s.v[s.v.length-1];
+
+return `<h1>Approval queue</h1><p class="sub">Review findings, discuss and decide. Nothing is published without a human decision.</p><div class="cols"><div>${S.subs.map(x=>`<div class="li ${x.id==s.id?'on':''}" onclick="S.sel=${x.id};render()"><b>${esc(x.title)}</b><div class="row note">${x.creator||x.author||'Unknown'} · v${x.v.length} ${chip(x.status)}</div></div>`).join('')}</div>
 <div class="card"><div class="row"><h2 style="margin:0">${esc(s.title)}</h2>${chip(s.status)}<span class="sp"></span>${sum(l.F)}</div><div class="doc mt">${hl(l.text,l.F)}</div>
-<h2 class="mt">Findings (${l.F.length})</h2>${l.F.length?l.F.map((f,i)=>fc(f,i,'r',l.dec[i])).join(''):'<p>✅ No issues found against approved sources.</p>'}
-<h2 class="mt">Discussion &amp; history</h2>${s.comments.map(c=>`<p>💬 <b>${c.u}:</b> ${esc(c.t)}</p>`).join('')||'<p class="note">No comments yet.</p>'}
+<h2 class="mt">Findings (${(l.F||[]).length})</h2>${(l.F||[]).length?(l.F||[]).map((f,i)=>fc(f,i,'r',(l.dec||{})[i])).join(''):'<p>✅ No issues found against approved sources.</p>'}
+<h2 class="mt">Discussion &amp; history</h2>${(s.comments||[]).map(c=>`<p>💬 <b>${c.u}:</b> ${esc(c.t)}</p>`).join('')||'<p class="note">No comments yet.</p>'}
 <div class="row mt"><input id="cm" placeholder="Add a comment for the creator…" style="flex:1"></div><div class="row mt"><button class="btn g" onclick="decide('Approved')">✅ Approve</button><button class="btn w" onclick="decide('Changes')">✏️ Request changes</button><button class="btn r" onclick="decide('Rejected')">⛔ Reject</button></div></div></div>`},
-insights(){const A=S.subs.flatMap(s=>s.v.flatMap(v=>v.F)),cnt=(k)=>{const m={};A.forEach(f=>m[f[k]]=(m[f[k]]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1])};
+insights(){const A=S.subs.flatMap(s=>(s.v||[]).flatMap(v=>Array.isArray(v.F)?v.F:[])),cnt=(k)=>{const m={};A.forEach(f=>m[f[k]]=(m[f[k]]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1])};
 const bars=(L)=>{const mx=Math.max(1,...L.map(x=>x[1]));return L.map(x=>`<div class="hb"><span>${esc(x[0].slice(0,22))}</span><div><i style="width:${x[1]/mx*100}%"></i></div><b>${x[1]}</b></div>`).join('')},src=cnt('s').slice(0,5),tr=[18,15,14,9,7,5],mx=18;
 return `<h1>Governance insights</h1><p class="sub">Spot repeated mistakes and unclear guidelines over time.</p><div class="grid"><div class="card kpi"><b>${A.length}</b><span>Findings logged</span></div><div class="card kpi"><b>4.2 h</b><span>Avg. time to approval (sample)</span></div><div class="card kpi"><b>38%</b><span>First-pass clean rate (sample)</span></div></div>
 <div class="grid mt" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="card"><h2>Mistakes by category</h2>${bars(cnt('c'))}</div><div class="card"><h2>Most-triggered sources</h2>${bars(src)}</div></div>
