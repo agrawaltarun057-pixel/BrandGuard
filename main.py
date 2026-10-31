@@ -1,5 +1,8 @@
 import fastapi
 import uvicorn
+import sqlite3
+import json
+from pathlib import Path
 
 print("FastAPI version:", fastapi.__version__)
 print("Uvicorn is ready!")
@@ -32,6 +35,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Persistent SQLite database setup
+BASE_DIR = Path(__file__).resolve().parent
+DB_FILE = BASE_DIR / "brandguard.db"
+
+def init_database():
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                data TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+init_database()
 
 # Initial data
 DB = {
@@ -75,6 +93,38 @@ DB = {
 
 COUNTERS = {"products": 2, "claims": 3, "rules": 6, "subs": 1}
 
+# Save application state permanently in SQLite
+def save_state():
+    state = {
+        "DB": DB,
+        "COUNTERS": COUNTERS
+    }
+
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute(
+            """
+            INSERT INTO app_state (id, data)
+            VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET data = excluded.data
+            """,
+            (json.dumps(state),)
+        )
+
+
+# Load saved state when the backend starts
+def load_state():
+    with sqlite3.connect(DB_FILE) as conn:
+        row = conn.execute(
+            "SELECT data FROM app_state WHERE id = 1"
+        ).fetchone()
+
+    if row:
+        saved_state = json.loads(row[0])
+        DB.update(saved_state["DB"])
+        COUNTERS.update(saved_state["COUNTERS"])
+
+
+load_state()
 
 def log_action(user, action, detail):
     DB["audit"].insert(0, {
@@ -83,6 +133,7 @@ def log_action(user, action, detail):
         "a": action,
         "d": detail
     })
+    save_state()
 
 
 @app.get("/")
@@ -280,7 +331,8 @@ def decide_submission(
     submission["comment"] = data.comment or ""
 
     log_action(x_user, data.status, submission["title"])
-
+    save_state()
+    
     return {"status": "success", "submission": submission}
 
 
@@ -310,6 +362,7 @@ def add_product(data: ProductRequest, x_user: str = "Tarun"):
     COUNTERS["products"] += 1
     DB["products"].append(item)
     log_action(x_user, "Product added", item["name"])
+    save_state()
     return item
 
 
@@ -319,6 +372,7 @@ def add_claim(data: ClaimRequest, x_user: str = "Tarun"):
     COUNTERS["claims"] += 1
     DB["claims"].append(item)
     log_action(x_user, "Claim added", item["text"])
+    save_state()
     return item
 
 
@@ -331,6 +385,7 @@ def add_rule(data: RuleRequest, x_user: str = "Tarun"):
     COUNTERS["rules"] += 1
     DB["rules"].append(item)
     log_action(x_user, "Rule added", item["term"])
+    save_state()
     return item
 
 
@@ -345,51 +400,5 @@ def delete_item(kind: str, item_id: int, x_user: str = "Tarun"):
 
     DB[kind].remove(item)
     log_action(x_user, f"{kind[:-1].title()} deleted", str(item_id))
+    save_state()
     return {"status": "success", "deleted_id": item_id}
-
-
-print("BrandGuard backend code loaded successfully!")
-
-import uvicorn
-import threading
-
-def run_server():
-    uvicorn.run(app, host="127.0.0.1", port=8000)
-
-server_thread = threading.Thread(target=run_server, daemon=True)
-server_thread.start()
-
-from pathlib import Path
-
-html_file = Path("index(3).html")
-
-print("File exists:", html_file.exists())
-
-if html_file.exists():
-    content = html_file.read_text(encoding="utf-8")
-    print("Correct API URL present:",
-          "http://127.0.0.1:8000" in content)
-    print("Old relative fetch present:",
-          "fetch(p," in content)
-
-from pathlib import Path
-
-html_file = Path("index(3).html")
-
-content = html_file.read_text(encoding="utf-8")
-
-old = "fetch(p,{"
-new = "fetch('http://127.0.0.1:8000'+p,{"
-
-if old in content:
-    content = content.replace(old, new, 1)
-    html_file.write_text(content, encoding="utf-8")
-    print("✅ HTML file updated successfully!")
-else:
-    print("⚠️ Old code not found. No changes made.")
-
-content = Path("index(3).html").read_text(encoding="utf-8")
-
-print("Correct API URL:", "fetch('http://127.0.0.1:8000'+p,{" in content)
-print("Old fetch:", "fetch(p,{" in content)
-
